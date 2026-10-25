@@ -1402,7 +1402,7 @@ const fpBtn=document.getElementById('fpBtn'),dpad=document.getElementById('dpad'
 const COARSE=matchMedia('(pointer:coarse)').matches;
 function setFP(on){if(!CUR&&on)return;fp=on;fly=null;controls.enabled=!on;controls.autoRotate=false;
   fpBtn.setAttribute('aria-pressed',on);fpBtn.textContent=on?'🗺 俯瞰視角':'👣 第一人稱視角';document.body.classList.toggle('fp',on);
-  dpad.hidden=!(on&&COARSE);mmWrap.hidden=!on;mmB=null;fpHint.hidden=!on;if(on){clearTimeout(setFP.t);setFP.t=setTimeout(()=>{fpHint.hidden=true;},6000);}
+  dpad.hidden=!(CUR&&COARSE);mmWrap.hidden=!on;mmB=null;fpHint.hidden=!on;if(on){clearTimeout(setFP.t);setFP.t=setTimeout(()=>{fpHint.hidden=true;},6000);}
   if(on){yaw=meAv.g.rotation.y;pitch=-.06;}
   else{const f=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));controls.target.set(me.pos.x,TOP,me.pos.z);camera.position.set(me.pos.x-f.x*6,TOP+5.5,me.pos.z-f.z*6);farView=false;followCk.checked=true;}
   resize();}
@@ -1588,7 +1588,7 @@ function openAlert(n){const c=n.case;stopReading();backBtn.hidden=false;setHighl
   if(c.picked==null){if(c.t0==null)c.t0=performance.now();clearInterval(alertTimer);const bar=document.getElementById('abar');
     alertTimer=setInterval(()=>{const k=(performance.now()-c.t0)/1000/ALERT_SEC;if(bar)bar.style.width=Math.max(0,100-k*100)+'%';if(k>=1)done(-1,true);},100);
     pbody.querySelectorAll('button.ab').forEach(b=>b.addEventListener('click',()=>done(+b.dataset.a,false)));}
-  const fin=document.getElementById('rFinish');if(fin)fin.addEventListener('click',()=>{endRescue(true);openOverview();});}
+  const fin=document.getElementById('rFinish');if(fin)fin.addEventListener('click',()=>{endRescue(true);hidePanel();});}
 
 function openRescue(){const n=RS.active;if(!n)return;const c=n.case;if(c.type==='alert'){openAlert(n);return;}stopReading();backBtn.hidden=false;setHighlight('o');
   if(!c.Q){c.Q=caseQs(c);c.i=0;c.miss=0;c.hl=[];}
@@ -1603,7 +1603,7 @@ function openRescue(){const n=RS.active;if(!n)return;const c=n.case;if(c.type===
   pbody.querySelectorAll('button.ro').forEach(b=>b.addEventListener('click',()=>{const q=c.Q[c.i];q.picked=+b.dataset.a;if(q.picked!==q.ans)c.miss++;c.i++;
     if(c.i>=c.Q.length){RS.count++;if(c.miss===0){RS.perfect++;c.gain=10;RS.score+=10;toast('+10 分');}else{c.gain=0;}saveRescue();renderRescue();}
     const y=pbody.scrollTop;openRescue();pbody.scrollTop=y;setTimeout(()=>{const last=pbody.querySelector('.rq:last-of-type,.rdone');if(last)last.scrollIntoView({behavior:reduce?'auto':'smooth',block:'nearest'});},30);}));
-  const fin=document.getElementById('rFinish');if(fin)fin.addEventListener('click',()=>{endRescue(true);openOverview();});}
+  const fin=document.getElementById('rFinish');if(fin)fin.addEventListener('click',()=>{endRescue(true);hidePanel();});}
 function saveRescue(){try{localStorage.setItem('htn-rescue',JSON.stringify({c:RS.count,p:RS.perfect,s:RS.score,k:RS.streak,b:RS.best}));}catch(e){}}
 function renderRescue(){const el=document.getElementById('rescueCount');if(el)el.textContent=`幫助 ${RS.count} 人・全對 ${RS.perfect}`;const sc=document.getElementById('rescueScore');if(sc)sc.textContent=`🏅 ${RS.score} 分`;}
 const helpMark=new THREE.Group();{const m=new THREE.MeshBasicMaterial({color:'#B65F5B'});helpMark.add(new THREE.Mesh(new THREE.CylinderGeometry(.028,.02,.13,8),m));const d=new THREE.Mesh(new THREE.SphereGeometry(.026,8,6),m);d.position.y=-.11;helpMark.add(d);helpMark.visible=false;scene.add(helpMark);}
