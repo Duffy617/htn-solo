@@ -65,6 +65,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-body);overflow:hi
 
 /* time */
 #hudR{position:absolute;top:16px;right:max(16px,env(safe-area-inset-right,0px));z-index:6;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+#tsRow{display:flex;gap:6px;align-items:stretch}
+#bgmBtn{all:unset;box-sizing:border-box;cursor:pointer;display:grid;place-items:center;width:42px;border-radius:14px;color:var(--ink);background:var(--panel);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);box-shadow:var(--shadow)}
+#bgmBtn svg{width:17px;height:17px}
+#bgmBtn[aria-pressed="true"]{color:#962B3C}
 #timeseg{display:flex;padding:4px;gap:2px}
 #timeseg button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);padding:6px 10px;border-radius:8px}
 #timeseg button svg{width:15px;height:15px}
@@ -330,9 +334,9 @@ span.ro{cursor:default;color:var(--r-dim)}span.ro.ok{border-color:var(--r-ok-bd)
   </section>
 
   <div id="hudR">
-    <div id="timeseg" class="card" role="group" aria-label="日景／夜景">
+    <div id="tsRow"><button type="button" id="bgmBtn" class="card" aria-pressed="false" title="背景音樂" aria-label="背景音樂"></button><div id="timeseg" class="card" role="group" aria-label="日景／夜景">
       <button type="button" data-t="day" aria-pressed="false"></button><button type="button" data-t="night" aria-pressed="false"></button><button type="button" data-t="auto" aria-pressed="false"></button>
-    </div>
+    </div></div>
     <div id="mmWrap" class="card" hidden><canvas id="minimap" width="180" height="180" aria-label="小地圖：點一下走過去"></canvas></div>
   </div>
   <button id="reopen" class="card" type="button" hidden>島嶼總覽</button>
@@ -674,6 +678,27 @@ function applySky(p){
 const ICON_SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 const ICON_MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
 const ICON_CYC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>';
+
+/* ---- 背景音樂：Web Audio 無縫循環（loopStart/loopEnd 取樣精準） ---- */
+const BGM={ctx:null,src:null,gain:null,buf:null,on:true,loading:false,LS:3658878/48000,LE:6165504/48000};
+try{if(localStorage.getItem('htn-bgm')==='off')BGM.on=false;}catch(e){}
+const bgmBtn=document.getElementById('bgmBtn');
+const IC_NOTE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+const IC_MUTE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M3 3l18 18"/></svg>';
+function bgmUI(){bgmBtn.innerHTML=BGM.on?IC_NOTE:IC_MUTE;bgmBtn.setAttribute('aria-pressed',BGM.on);bgmBtn.title=BGM.on?'背景音樂：開':'背景音樂：關';}
+async function bgmStart(){if(!BGM.on)return;
+  try{if(!BGM.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;BGM.ctx=new AC();BGM.gain=BGM.ctx.createGain();BGM.gain.gain.value=0;BGM.gain.connect(BGM.ctx.destination);}
+    if(BGM.ctx.state==='suspended')await BGM.ctx.resume();
+    if(!BGM.buf){if(BGM.loading)return;BGM.loading=true;const r=await fetch('data/bgm.mp3');const ab=await r.arrayBuffer();BGM.buf=await new Promise((ok,no)=>BGM.ctx.decodeAudioData(ab,ok,no));BGM.loading=false;}
+    if(BGM.src||!BGM.on)return;
+    const s=BGM.ctx.createBufferSource();s.buffer=BGM.buf;s.loop=true;s.loopStart=BGM.LS;s.loopEnd=BGM.LE;s.connect(BGM.gain);s.start();BGM.src=s;
+    const g=BGM.gain.gain,t=BGM.ctx.currentTime;g.cancelScheduledValues(t);g.setValueAtTime(g.value,t);g.linearRampToValueAtTime(.42,t+2.5);
+  }catch(e){BGM.loading=false;}}
+function bgmStop(){if(!BGM.ctx||!BGM.src)return;const g=BGM.gain.gain,t=BGM.ctx.currentTime,s=BGM.src;BGM.src=null;g.cancelScheduledValues(t);g.setValueAtTime(g.value,t);g.linearRampToValueAtTime(0,t+.6);setTimeout(()=>{try{s.stop();}catch(e){}},700);}
+bgmBtn.addEventListener('click',e=>{e.stopPropagation();BGM.on=!BGM.on;try{localStorage.setItem('htn-bgm',BGM.on?'on':'off');}catch(_){}bgmUI();BGM.on?bgmStart():bgmStop();});
+['pointerdown','keydown','touchend'].forEach(ev=>addEventListener(ev,()=>{if(BGM.on&&!BGM.src)bgmStart();},{capture:true}));
+document.addEventListener('visibilitychange',()=>{if(!BGM.ctx)return;if(document.hidden)BGM.ctx.suspend();else if(BGM.on)BGM.ctx.resume();});
+bgmUI();
 const timeseg=document.getElementById('timeseg');
 try{const t=localStorage.getItem('htn-time');if(t==='day'||t==='night'||t==='auto')timeMode=t;else timeMode='day';}catch(e){timeMode='day';}
 if(timeMode==='night')phase=.75;else if(timeMode==='day')phase=.25;
